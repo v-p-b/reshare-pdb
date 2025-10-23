@@ -159,12 +159,12 @@ base_type_size = {
 types = {
     "ptr": ReshDataTypePy(
         name="void *",
-        content=ReshDataTypeContentPrimitive(type="PRIMITIVE"),
+        content=ReshDataTypeContentPrimitivePy(),
         size=8,
     ),
     "void *": ReshDataTypePy(
         name="void *",
-        content=ReshDataTypeContentPrimitive(type="PRIMITIVE"),
+        content=ReshDataTypeContentPrimitivePy(),
         size=8,
     ),
 }
@@ -218,7 +218,7 @@ def create_structure(T):
 
                 overlapping_offset = is_overlapping(struct_map, member.offset)
                 if overlapping_offset is not None:
-                    resh_member_wrapped = ReshStructureMember(
+                    resh_member_wrapped = ReshStructureMemberPy(
                         type=resh_member.name,
                         name=member_name,
                         offset=member.offset,
@@ -247,7 +247,7 @@ def create_structure(T):
                         )
                         types[union_name] = union_type
                         struct_map[member.offset] = [
-                            ReshStructureMember(
+                            ReshStructureMemberPy(
                                 type=union_name,
                                 name=union_name,
                                 offset=member.offset,
@@ -256,7 +256,7 @@ def create_structure(T):
                         ]
                 else:
                     struct_map[member.offset] = [
-                        ReshStructureMember(
+                        ReshStructureMemberPy(
                             type=resh_member.name,
                             name=member_name,
                             offset=member.offset,
@@ -315,7 +315,7 @@ def create_union(T):
                 else:
                     offset = -1
                 content.members.append(
-                    ReshStructureMember(
+                    ReshStructureMemberPy(
                         type=resh_member.name,
                         name=member_name,
                         offset=offset,
@@ -337,7 +337,7 @@ def get_single_type(T):
             return types[str(T)]
         ret = ReshDataTypePy(
             name=str(T),
-            content=ReshDataTypeContentPrimitive(type="PRIMITIVE"),
+            content=ReshDataTypeContentPrimitivePy(),
             size=base_type_size[str(T)],
         )
         types[str(T)] = ret
@@ -418,7 +418,7 @@ def get_single_type(T):
             for i, arg in enumerate(T.arglist.arg_type):
                 my_arg = get_single_type(arg)
                 arg_list.append(
-                    ReshFunctionArgument(name="param%d" % (i,), type=my_arg.name)
+                    ReshFunctionArgumentPy(name="param%d" % (i,), type=my_arg.name)
                 )
 
         content = ReshDataTypeContentFunctionPy(
