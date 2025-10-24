@@ -1,2 +1,2 @@
-reshare==0.1.0
+reshare==0.1.1
 pdbparse @ git+https://github.com/v-p-b/pdbparse@5d404ba
