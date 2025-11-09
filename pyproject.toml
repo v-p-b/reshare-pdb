@@ -1,0 +1,20 @@
+[project]
+name = "reshare-pdb"
+version = "0.1.0"
+description = "Export from PDB to the REshare exchange format"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pdbparse>=2.0.0",
+    "reshare==0.1.2",
+]
+
+[tool.uv.sources]
+pdbparse = { git = "https://github.com/v-p-b/pdbparse", rev = "7bd26aa" }
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=1.18.2",
+]
+
