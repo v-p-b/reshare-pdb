@@ -1,6 +1,6 @@
 # REshare-PDB
 
-Platform independent [REshare](https://github.com/v-p-b/reshare) exporter for PDB's, built with [pdbparse](#TODO) by Moyix.
+Platform independent [REshare](https://github.com/v-p-b/reshare) exporter for PDB's, built with and [updated fork of pdbparse](https://github.com/v-p-b/pdbparse) (originally by Moyix).
 
 Type parsing code is based on Ry Auscitte's work - many thanks for it:
 
