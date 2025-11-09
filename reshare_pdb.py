@@ -136,7 +136,7 @@ base_type_size = {
     "T_64PCHAR": 8,
     "T_INT4": 4,
     "T_INT8": 8,
-    "T_LONG": 4,
+    "T_LONG": 8,
     "T_QUAD": 8,
     "T_RCHAR": 1,
     "T_REAL32": 4,
@@ -145,7 +145,7 @@ base_type_size = {
     "T_SHORT": 2,
     "T_UCHAR": 1,
     "T_UINT4": 4,
-    "T_ULONG": 4,
+    "T_ULONG": 8,
     "T_UQUAD": 8,
     "T_USHORT": 2,
     "T_WCHAR": 2,
@@ -172,10 +172,14 @@ types = {
 
 resh_union_count = 0
 
+@dataclass
+class StructMapMember:
+    member: ReshStructureMemberPy
+    size: int
 
-def is_overlapping(map: dict[int, ReshStructureMemberPy], offset: int) -> int|None:
+def is_overlapping(map: dict[int, StructMapMember], offset: int) -> int|None:
     for k, v in map.items():
-        if offset >= k and offset < k + v[1]:
+        if offset >= k and offset < k + v.size:
             return k
     return None
 
@@ -190,7 +194,7 @@ def create_structure(T: Container) -> ReshDataType:
         ret.content = content
     else:
         last_bitfield = None
-        struct_map : dict[int, tuple[ReshStructureMemberPy,int]]= (
+        struct_map : dict[int, StructMapMember]= (
             {}
         )  # https://www.vergiliusproject.com/kernels/x64/windows-11/24h2/_DISPATCHER_HEADER
         substructs = list(filter(
@@ -228,18 +232,18 @@ def create_structure(T: Container) -> ReshDataType:
                         offset=member.offset-overlapping_offset,
                     )
                     existing: ReshStructureMemberPy
-                    existing , _ = struct_map[overlapping_offset]
+                    existing  = struct_map[overlapping_offset].member
                     if existing.name.startswith("resh_union"):
                         # We already have a union here, add the current member
                         types[existing.name].content.members.append(resh_member_wrapped)
-                        if resh_member.size > struct_map[overlapping_offset][1]:
-                            struct_map[overlapping_offset][1] = resh_member.size
+                        if resh_member.size > struct_map[overlapping_offset].size:
+                            struct_map[overlapping_offset].size = resh_member.size
                     else:
                         # Create a new union and reference it by name from the structure
                         union_name = "resh_union%04X" % (resh_union_count)
                         resh_union_count += 1
 
-                        size = struct_map[overlapping_offset][1]
+                        size = struct_map[overlapping_offset].size
                         if resh_member.size > size:
                             size = resh_member.size
 
@@ -255,23 +259,21 @@ def create_structure(T: Container) -> ReshDataType:
                             size=size,
                         )
                         types[union_name] = union_type
-                        struct_map[member.offset] = [
+                        struct_map[member.offset] = StructMapMember(member=
                             ReshStructureMemberPy(
                                 type=union_name,
                                 name=union_name,
                                 offset=member.offset,
-                            ),
-                            size,
-                        ]
+                            ),size=size)
                 else:
-                    struct_map[member.offset] = [
-                        ReshStructureMemberPy(
+                    struct_map[member.offset] = StructMapMember(
+                        member=ReshStructureMemberPy(
                             type=resh_member.name,
                             name=member_name,
                             offset=member.offset,
                         ),
-                        resh_member.size,
-                    ]
+                        size=resh_member.size,
+                    )
             except AttributeError:
                 # print(dir(member))
                 # print(member.name)
@@ -280,7 +282,7 @@ def create_structure(T: Container) -> ReshDataType:
                 raise
                 continue
 
-        content.members = [x[0] for _, x in sorted(struct_map.items())]
+        content.members = [x.member for _, x in sorted(struct_map.items())]
         ret.content = content
     return ret
 
@@ -400,13 +402,18 @@ def get_single_type(T: Container) -> ReshDataType|None:
             print(member_type)
             raise Exception("Can't determine size for '%s'" % (member_type.name))
 
+        array_item_count:int
         if T.size % member_type_size != 0:
-            raise Exception(
-                "Not dividers: '%s' (%d) / '%s' (%d) "
-                % (T.name, T.size, member_type.name, member_type_size)
-            )
-
-        array_item_count = int(T.size / member_type_size)
+            # Ugly fallback, see _COMPRESSED_DATA_INFO
+            if T.size % 4 == 0:
+                array_item_count = int(T.size/4)
+            else:
+                raise Exception(
+                    "Not dividers: '%s' (%d) / '%s' (%d) "
+                    % (T.name, T.size, member_type.name, member_type_size)
+                )
+        else:
+            array_item_count = int(T.size / member_type_size)
         content = ReshDataTypeContentArrayPy(
             base_type=ReshTypeSpec(type_name=member_type.name, embedded_type=member_type),
             length=array_item_count,
