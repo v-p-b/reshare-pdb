@@ -21,20 +21,30 @@ def fetch_ms_pdb(name: str, guid: str) -> pdbparse.PDBStream:
 
     return pdbparse.parse(pdb_path)
 
+def get_type_by_name(name, resh_json):
+    return list(
+        filter(lambda x: x["name"] == name, resh_json["data-types"])
+    )[0]
 
 def test_ks():
     guid = "D4AAE7F3BE9448F6ED5F16DA1B97FFBD1"
     pdb = fetch_ms_pdb("ks.pdb", guid)
     resh_json = reshare_pdb.export(pdb).to_json_data()
-    s_iosl = list(
-        filter(lambda x: x["name"] == "_IO_STACK_LOCATION", resh_json["data-types"])
-    )[0]
 
+    s_iosl = get_type_by_name("_IO_STACK_LOCATION",resh_json)
+   
     assert s_iosl["size"] == 0x48
     print("[+] test_ks _IO_STACK_LOCATION size")
 
     assert len(s_iosl["content"]["members"]) == 9
     print("[+] test_ks _IO_STACK_LOCATION member count")
 
+    s_owner_entry = get_type_by_name("_OWNER_ENTRY", resh_json)
+    assert s_owner_entry["size"] == 0x10
+    print("[+] test_ks _OWNER_ENTRY size")
+    s_oe_union_name=s_owner_entry["content"]["members"][1]["type"]["type-name"]
+    s_oe_union=get_type_by_name(s_oe_union_name, resh_json)
+    assert len(s_oe_union["content"]["members"])==2
+    print("[+] test_ks _OWNER_ENTRY union size")
 
 test_ks()

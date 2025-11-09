@@ -173,13 +173,13 @@ types = {
 resh_union_count = 0
 
 
-def is_overlapping(map, offset):
+def is_overlapping(map: dict[int, ReshStructureMemberPy], offset: int) -> int|None:
     for k, v in map.items():
         if offset >= k and offset < k + v[1]:
             return k
     return None
 
-def create_structure(T):
+def create_structure(T: Container) -> ReshDataType:
     global resh_union_count
 
     ret = ReshDataTypePy(name=T.name, content=None, size=T.size)
@@ -190,7 +190,7 @@ def create_structure(T):
         ret.content = content
     else:
         last_bitfield = None
-        struct_map = (
+        struct_map : dict[int, tuple[ReshStructureMemberPy,int]]= (
             {}
         )  # https://www.vergiliusproject.com/kernels/x64/windows-11/24h2/_DISPATCHER_HEADER
         substructs = list(filter(
@@ -206,6 +206,8 @@ def create_structure(T):
                     hasattr(member.index, "leaf_type")
                     and member.index.leaf_type == "LF_BITFIELD"
                 ):
+                    # If this is a bitfield, we just create the base type once,
+                    # then ignore other bitfield members for now...
                     if last_bitfield != int(member.index.leaf_type):
                         resh_member = get_single_type(member.index.base_type)
                         last_bitfield = int(member.index.leaf_type)
@@ -213,29 +215,36 @@ def create_structure(T):
                     else:
                         continue
                 else:
+                    # if not a bitfield, we treat the member as a regular old type
                     last_bitfield = None
                     resh_member = get_single_type(member.index)
 
                 overlapping_offset = is_overlapping(struct_map, member.offset)
                 if overlapping_offset is not None:
+                    # If the structure member offsets overlap, then we treat overlapping members as a union
                     resh_member_wrapped = ReshStructureMemberPy(
                         type=resh_member.name,
                         name=member_name,
-                        offset=member.offset,
+                        offset=member.offset-overlapping_offset,
                     )
-
-                    existing, _ = struct_map[overlapping_offset]
+                    existing: ReshStructureMemberPy
+                    existing , _ = struct_map[overlapping_offset]
                     if existing.name.startswith("resh_union"):
+                        # We already have a union here, add the current member
                         types[existing.name].content.members.append(resh_member_wrapped)
                         if resh_member.size > struct_map[overlapping_offset][1]:
                             struct_map[overlapping_offset][1] = resh_member.size
                     else:
+                        # Create a new union and reference it by name from the structure
                         union_name = "resh_union%04X" % (resh_union_count)
                         resh_union_count += 1
 
                         size = struct_map[overlapping_offset][1]
                         if resh_member.size > size:
                             size = resh_member.size
+
+                        # Offset of the existing member must be aligned to the union, not the containing structure
+                        existing.offset -= overlapping_offset
 
                         union_content = ReshDataTypeContentUnionPy(
                             members=[existing, resh_member_wrapped]
@@ -276,7 +285,7 @@ def create_structure(T):
     return ret
 
 
-def create_union(T):
+def create_union(T: Container) -> ReshDataType:
     ret = ReshDataTypePy(name=T.name, content=None, size=T.size)
     content = ReshDataTypeContentUnionPy(members=[])
     try:
@@ -329,7 +338,7 @@ def create_union(T):
     return ret
 
 
-def get_single_type(T):
+def get_single_type(T: Container) -> ReshDataType|None:
     ret = None
 
     if "tpi_idx" not in dir(T):
